@@ -1,0 +1,10 @@
+site:
+    pages: src
+    layouts: layouts
+    partials: partials
+    public: public
+
+    data:
+        website-name: Basalt Example Website
+
+    out: dist
