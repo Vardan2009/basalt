@@ -1,10 +1,15 @@
 #include "builder.h"
 
+#include <fstream>
+#include <memory>
+
 #include "tty.h"
 
 DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
     tty::log("Initializing DistBuilder...");
     tty::log("Project Root: {}", projectRoot.generic_string());
+
+    mdParser = std::make_shared<maddy::Parser>();
 
     try {
         projectConfig = YAML::LoadFile((projectRoot / "basalt.yml").string())["site"];
@@ -44,15 +49,11 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
         if (!entry.is_regular_file()) continue;
         if (entry.path().extension() != ".md") continue;
 
-        tty::log("Page: {} ==> {}", entry.path().generic_string(),
-                 toPermalink(pagesPath, entry.path()));
+        pages.push_back(parsePage(entry.path()));
     }
 }
 
-std::string DistBuilder::toPermalink(const std::filesystem::path &root,
-                                     const std::filesystem::path &file) {
-    namespace fs = std::filesystem;
-
+std::string DistBuilder::toPermalink(const fs::path &root, const fs::path &file) {
     fs::path absRoot = fs::weakly_canonical(root);
     fs::path absFile = fs::weakly_canonical(file);
 
@@ -67,4 +68,61 @@ std::string DistBuilder::toPermalink(const std::filesystem::path &root,
     if (url.empty()) url = "/";
 
     return url;
+}
+
+DistBuilder::Page DistBuilder::parsePage(const fs::path &path) {
+    std::string route = toPermalink(pagesPath, path);
+
+    FrontmatterSplit dat = ReadSplitFrontmatter(path);
+
+    std::stringstream input(dat.markdown);
+    std::string innerHTML = mdParser->Parse(input);
+
+    YAML::Node pageData = YAML::Load(dat.yaml);
+
+    return Page{route, innerHTML, pageData};
+}
+
+DistBuilder::FrontmatterSplit DistBuilder::ReadSplitFrontmatter(const fs::path &path) {
+    std::ifstream file(path);
+    if (!file) {
+        tty::err("(in {}) Failed to open file", path.generic_string());
+        exit(1);
+    }
+
+    std::string line;
+
+    if (!std::getline(file, line) || line != "---") {
+        tty::err("(in {}) Invalid Markdown page structure. First line must be `---`",
+                 path.generic_string());
+        exit(1);
+    }
+
+    std::string yaml;
+    std::string markdown;
+
+    bool found_end = false;
+
+    while (std::getline(file, line)) {
+        if (line == "---") {
+            found_end = true;
+            break;
+        }
+        yaml += line;
+        yaml += '\n';
+    }
+
+    if (!found_end) {
+        tty::err("(in {}) Invalid Markdown page structure. YAML frontmatter not terminated",
+                 path.generic_string());
+        exit(1);
+    }
+
+    std::string rest;
+    while (std::getline(file, line)) {
+        markdown += line;
+        if (!file.eof()) markdown += '\n';
+    }
+
+    return FrontmatterSplit{std::move(yaml), std::move(markdown)};
 }

@@ -1,10 +1,12 @@
 #pragma once
 
+#include <maddy/parser.h>
 #include <yaml-cpp/yaml.h>
 
 #include <filesystem>
+#include <string_view>
 #include <unordered_map>
-#include <vector >
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -26,8 +28,17 @@ class DistBuilder {
         std::string innerHTML;
     };
 
+    struct FrontmatterSplit {
+        std::string yaml;
+        std::string markdown;
+    };
+
    private:
-    std::string toPermalink(const std::filesystem::path &root, const std::filesystem::path &file);
+    std::string toPermalink(const fs::path &root, const fs::path &file);
+
+    Page parsePage(const fs::path &path);
+
+    FrontmatterSplit ReadSplitFrontmatter(const fs::path &path);
 
     fs::path projectRoot;
     YAML::Node projectConfig;
@@ -42,4 +53,6 @@ class DistBuilder {
     std::unordered_map<std::string, Partial> partials;
 
     YAML::Node globalData;
+
+    std::shared_ptr<maddy::Parser> mdParser;
 };
