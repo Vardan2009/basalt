@@ -3,6 +3,8 @@
 #include <yaml-cpp/yaml.h>
 
 #include <filesystem>
+#include <unordered_map>
+#include <vector >
 
 namespace fs = std::filesystem;
 
@@ -16,7 +18,17 @@ class DistBuilder {
         YAML::Node pageData;
     };
 
+    struct Layout {
+        std::string innerHTML;
+    };
+
+    struct Partial {
+        std::string innerHTML;
+    };
+
    private:
+    std::string toPermalink(const std::filesystem::path &root, const std::filesystem::path &file);
+
     fs::path projectRoot;
     YAML::Node projectConfig;
 
@@ -26,4 +38,8 @@ class DistBuilder {
     fs::path publicPath;
 
     std::vector<Page> pages;
+    std::unordered_map<std::string, Layout> layouts;
+    std::unordered_map<std::string, Partial> partials;
+
+    YAML::Node globalData;
 };

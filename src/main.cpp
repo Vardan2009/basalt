@@ -16,15 +16,7 @@ int main(int argc, char *argv[]) {
               << '\n'
               << tty::reset();
 
-    // DistBuilder builder("..\\..\\..\\example");
-
-    std::stringstream testInput("# Works!");
-
-    std::shared_ptr<maddy::Parser> parser = std::make_shared<maddy::Parser>();
-
-    std::string htmlOutput = parser->Parse(testInput);
-
-    std::cout << htmlOutput;
+    DistBuilder builder("..\\..\\..\\example");
 
     return 0;
 }
