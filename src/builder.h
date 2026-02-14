@@ -10,6 +10,12 @@ class DistBuilder {
    public:
     DistBuilder(fs::path projectRoot);
 
+    struct Page {
+        std::string route;
+        std::string innerHTML;
+        YAML::Node pageData;
+    };
+
    private:
     fs::path projectRoot;
     YAML::Node projectConfig;
@@ -18,4 +24,6 @@ class DistBuilder {
     fs::path layoutsPath;
     fs::path partialsPath;
     fs::path publicPath;
+
+    std::vector<Page> pages;
 };

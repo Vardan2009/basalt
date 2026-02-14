@@ -1,3 +1,6 @@
 [submodule "src/vendor/yaml-cpp"]
 	path = src/vendor/yaml-cpp
 	url = https://github.com/jbeder/yaml-cpp
+[submodule "src/vendor/maddy"]
+	path = src/vendor/maddy
+	url = https://github.com/progsource/maddy
