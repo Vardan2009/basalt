@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <memory>
+#include <utility>
 
 #include "tty.h"
 
@@ -10,6 +11,8 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
     tty::log("Project Root: {}", projectRoot.generic_string());
 
     mdParser = std::make_shared<maddy::Parser>();
+    htmlParser = myhtml_create();
+    myhtml_init(htmlParser, MyHTML_OPTIONS_DEFAULT, 1, 0);
 
     try {
         projectConfig = YAML::LoadFile((projectRoot / "basalt.yml").string())["site"];
@@ -55,7 +58,7 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
             }
 
             Page p = parsePage(entry.path());
-            pages.push_back(p);
+            pages.push_back(std::move(p));
         }
     else
         tty::warn("No pages path provided in config");
@@ -77,7 +80,7 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
                 exit(1);
             }
 
-            layouts[id] = layout;
+            layouts[id] = std::move(layout);
         }
     else
         tty::warn("No layouts path provided in config");
@@ -99,9 +102,11 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
                 exit(1);
             }
 
-            partials[id] = partial;
+            partials[id] = std::move(partial);
         }
 }
+
+DistBuilder::~DistBuilder() { myhtml_destroy(htmlParser); }
 
 std::string DistBuilder::toPermalink(const fs::path &root, const fs::path &file) {
     fs::path absRoot = fs::weakly_canonical(root);
@@ -124,13 +129,14 @@ DistBuilder::Page DistBuilder::parsePage(const fs::path &path) {
     std::string route = toPermalink(pagesPath, path);
 
     FrontmatterSplit dat = ReadSplitFrontmatter(path);
-
     std::stringstream input(dat.markdown);
-    std::string innerHTML = mdParser->Parse(input);
+    std::string htmlSrc = mdParser->Parse(input);
+
+    auto innerHTML = std::make_unique<HTMLTree>(htmlParser, htmlSrc);
 
     YAML::Node pageData = YAML::Load(dat.yaml);
 
-    return Page{route, innerHTML, pageData};
+    return Page{route, std::move(innerHTML), pageData};
 }
 
 std::pair<std::string, DistBuilder::HTML> DistBuilder::readHTML(const fs::path &path) {
@@ -139,13 +145,15 @@ std::pair<std::string, DistBuilder::HTML> DistBuilder::readHTML(const fs::path &
         tty::err("(in {}) Failed to open file", path.generic_string());
         exit(1);
     }
-    std::string innerHTML;
+    std::string htmlSrc;
 
     std::string line;
 
-    while (std::getline(file, line)) innerHTML += line;
+    while (std::getline(file, line)) htmlSrc += line;
 
-    return {path.stem().generic_string(), HTML{path, innerHTML}};
+    auto innerHTML = std::make_unique<HTMLTree>(htmlParser, htmlSrc);
+
+    return {path.stem().generic_string(), HTML{path, std::move(innerHTML)}};
 }
 
 DistBuilder::FrontmatterSplit DistBuilder::ReadSplitFrontmatter(const fs::path &path) {

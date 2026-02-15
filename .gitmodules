@@ -4,3 +4,6 @@
 [submodule "src/vendor/maddy"]
 	path = src/vendor/maddy
 	url = https://github.com/progsource/maddy
+[submodule "src/vendor/myhtml"]
+	path = src/vendor/myhtml
+	url = https://github.com/lexborisov/myhtml.git
