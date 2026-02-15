@@ -20,11 +20,8 @@ class DistBuilder {
         YAML::Node pageData;
     };
 
-    struct Layout {
-        std::string innerHTML;
-    };
-
-    struct Partial {
+    struct HTML {
+        fs::path path;
         std::string innerHTML;
     };
 
@@ -37,6 +34,7 @@ class DistBuilder {
     std::string toPermalink(const fs::path &root, const fs::path &file);
 
     Page parsePage(const fs::path &path);
+    std::pair<std::string, HTML> readHTML(const fs::path &path);
 
     FrontmatterSplit ReadSplitFrontmatter(const fs::path &path);
 
@@ -49,8 +47,8 @@ class DistBuilder {
     fs::path publicPath;
 
     std::vector<Page> pages;
-    std::unordered_map<std::string, Layout> layouts;
-    std::unordered_map<std::string, Partial> partials;
+    std::unordered_map<std::string, HTML> layouts;
+    std::unordered_map<std::string, HTML> partials;
 
     YAML::Node globalData;
 

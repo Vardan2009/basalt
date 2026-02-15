@@ -1,5 +1,5 @@
 ---
-title: Main Page
+title: Stuff Page
 
 layout: page
 ---

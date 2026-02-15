@@ -45,12 +45,62 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
     tty::log("Partials: {}", partialsPath.empty() ? "Not found" : partialsPath.generic_string());
     tty::log("Public:   {}\n", publicPath.empty() ? "Not found" : publicPath.generic_string());
 
-    for (const auto &entry : fs::recursive_directory_iterator(pagesPath)) {
-        if (!entry.is_regular_file()) continue;
-        if (entry.path().extension() != ".md") continue;
+    if (!pagesPath.empty())
+        for (const auto &entry : fs::recursive_directory_iterator(pagesPath)) {
+            if (!entry.is_regular_file()) continue;
+            if (entry.path().extension() != ".md") {
+                tty::warn("`{}` is not a Markdown (.md) file, ignoring",
+                          entry.path().generic_string());
+                continue;
+            }
 
-        pages.push_back(parsePage(entry.path()));
-    }
+            Page p = parsePage(entry.path());
+            pages.push_back(p);
+        }
+    else
+        tty::warn("No pages path provided in config");
+
+    if (!layoutsPath.empty())
+        for (const auto &entry : fs::recursive_directory_iterator(layoutsPath)) {
+            if (!entry.is_regular_file()) continue;
+            if (entry.path().extension() != ".html") {
+                tty::warn("`{}` is not an HTML (.html) file, ignoring",
+                          entry.path().generic_string());
+                continue;
+            }
+
+            auto [id, layout] = readHTML(entry.path());
+
+            if (layouts.contains(id)) {
+                tty::err("Duplicate layouts with id `{}` found!\n - {}\n - {}", id,
+                         layouts[id].path.generic_string(), layout.path.generic_string());
+                exit(1);
+            }
+
+            layouts[id] = layout;
+        }
+    else
+        tty::warn("No layouts path provided in config");
+
+    if (!partialsPath.empty())
+        for (const auto &entry : fs::recursive_directory_iterator(partialsPath)) {
+            if (!entry.is_regular_file()) continue;
+            if (entry.path().extension() != ".html") {
+                tty::warn("`{}` is not an HTML (.html) file, ignoring",
+                          entry.path().generic_string());
+                continue;
+            }
+
+            auto [id, partial] = readHTML(entry.path());
+
+            if (partials.contains(id)) {
+                tty::err("Duplicate partials with id `{}` found!\n - {}\n - {}", id,
+                         partials[id].path.generic_string(), partial.path.generic_string());
+                exit(1);
+            }
+
+            partials[id] = partial;
+        }
 }
 
 std::string DistBuilder::toPermalink(const fs::path &root, const fs::path &file) {
@@ -81,6 +131,21 @@ DistBuilder::Page DistBuilder::parsePage(const fs::path &path) {
     YAML::Node pageData = YAML::Load(dat.yaml);
 
     return Page{route, innerHTML, pageData};
+}
+
+std::pair<std::string, DistBuilder::HTML> DistBuilder::readHTML(const fs::path &path) {
+    std::ifstream file(path);
+    if (!file) {
+        tty::err("(in {}) Failed to open file", path.generic_string());
+        exit(1);
+    }
+    std::string innerHTML;
+
+    std::string line;
+
+    while (std::getline(file, line)) innerHTML += line;
+
+    return {path.stem().generic_string(), HTML{path, innerHTML}};
 }
 
 DistBuilder::FrontmatterSplit DistBuilder::ReadSplitFrontmatter(const fs::path &path) {
