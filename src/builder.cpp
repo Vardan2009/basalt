@@ -118,6 +118,27 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
 DistBuilder::~DistBuilder() { myhtml_destroy(htmlParser); }
 
 void DistBuilder::BuildWebsite() {
+    if (fs::exists(outPath) && fs::is_directory(outPath)) {
+        tty::warn("Output path `{}` is not empty, delete and overwrite? (y/N)",
+                  outPath.generic_string());
+
+        char c;
+        std::cin >> c;
+
+        if (c != 'y' && c != 'Y') {
+            tty::warn("Aborting...");
+            exit(0);
+        }
+
+        std::error_code ec;
+        fs::remove_all(outPath, ec);
+
+        if (ec) {
+            tty::err("Error deleting output: {}", ec.message());
+            exit(1);
+        }
+    }
+
     tty::log("Starting build to `{}`...", outPath.generic_string());
     fs::create_directories(outPath);
 
@@ -126,12 +147,34 @@ void DistBuilder::BuildWebsite() {
         fs::path route = outPath / r.relative_path();
         tty::log("Creating `{}`", route.generic_string());
 
-        fs::create_directories(route);
+        std::error_code ec;
+        fs::create_directories(route, ec);
+        if (ec) {
+            tty::err("Error creating page for route: {}", ec.message());
+            exit(1);
+        }
 
         std::ofstream file(route / "index.html");
 
         // only serialize page content for now
         page.innerHTML->SerializeTo(file);
+    }
+
+    if (!publicPath.empty()) {
+        tty::log("Copying public `{}`...", publicPath.generic_string());
+
+        for (const auto &entry : fs::directory_iterator(publicPath)) {
+            std::error_code ec;
+
+            fs::copy(entry.path(), outPath / entry.path().filename(),
+                     fs::copy_options::recursive | fs::copy_options::overwrite_existing, ec);
+
+            if (ec) {
+                tty::err("Error copying `{}` to `{}`: {}", entry.path().generic_string(),
+                         (outPath / entry.path().filename()).generic_string(), ec.message());
+                exit(1);
+            }
+        }
     }
 }
 
