@@ -16,6 +16,8 @@ class DistBuilder {
     DistBuilder(fs::path projectRoot);
     ~DistBuilder();
 
+    void BuildWebsite();
+
     struct FrontmatterSplit {
         std::string yaml;
         std::string markdown;
@@ -24,16 +26,22 @@ class DistBuilder {
     struct HTMLTree {
         myhtml_tree_t *tree;
 
-        HTMLTree(myhtml_t *htmlParser, const std::string &src) {
+        HTMLTree(myhtml_t *htmlParser, const std::string &src, bool isFragment) {
             tree = myhtml_tree_create();
             myhtml_tree_init(tree, htmlParser);
-            myhtml_parse(tree, MyENCODING_UTF_8, src.c_str(), src.size());
+            if (isFragment)
+                myhtml_parse_fragment(tree, MyENCODING_UTF_8, src.c_str(), src.size(),
+                                      MyHTML_TAG_DIV, MyHTML_NAMESPACE_ANY);
+            else
+                myhtml_parse(tree, MyENCODING_UTF_8, src.c_str(), src.size());
         }
 
         ~HTMLTree() { myhtml_tree_destroy(tree); }
 
-        void Print();
-        void PrintNode(myhtml_tree_node_t *node, size_t inc);
+        void SerializeTo(std::ofstream &f) const;
+
+        void Print() const;
+        void PrintNode(myhtml_tree_node_t *node, size_t inc) const;
 
         static void PrintNodeAttrs(myhtml_tree_node_t *node);
     };
@@ -64,6 +72,7 @@ class DistBuilder {
     fs::path layoutsPath;
     fs::path partialsPath;
     fs::path publicPath;
+    fs::path outPath;
 
     std::vector<Page> pages;
     std::unordered_map<std::string, HTML> layouts;

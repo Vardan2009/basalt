@@ -43,10 +43,19 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
     if (projectConfig["public"].IsDefined())
         publicPath = projectRoot / (projectConfig["public"].as<std::string>());
 
+    if (projectConfig["out"].IsDefined())
+        outPath = projectRoot / (projectConfig["out"].as<std::string>());
+
     tty::log("Pages:    {}", pagesPath.empty() ? "Not found" : pagesPath.generic_string());
     tty::log("Layouts:  {}", layoutsPath.empty() ? "Not found" : layoutsPath.generic_string());
     tty::log("Partials: {}", partialsPath.empty() ? "Not found" : partialsPath.generic_string());
-    tty::log("Public:   {}\n", publicPath.empty() ? "Not found" : publicPath.generic_string());
+    tty::log("Public:   {}", publicPath.empty() ? "Not found" : publicPath.generic_string());
+    tty::log("Output:   {}\n", outPath.empty() ? "Not found" : outPath.generic_string());
+
+    if (outPath.empty()) {
+        tty::err("No output path specified in config! (missing `out`)");
+        exit(1);
+    }
 
     if (!pagesPath.empty())
         for (const auto &entry : fs::recursive_directory_iterator(pagesPath)) {
@@ -108,6 +117,24 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
 
 DistBuilder::~DistBuilder() { myhtml_destroy(htmlParser); }
 
+void DistBuilder::BuildWebsite() {
+    tty::log("Starting build to `{}`...", outPath.generic_string());
+    fs::create_directories(outPath);
+
+    for (const Page &page : pages) {
+        fs::path r = page.route;
+        fs::path route = outPath / r.relative_path();
+        tty::log("Creating `{}`", route.generic_string());
+
+        fs::create_directories(route);
+
+        std::ofstream file(route / "index.html");
+
+        // only serialize page content for now
+        page.innerHTML->SerializeTo(file);
+    }
+}
+
 std::string DistBuilder::toPermalink(const fs::path &root, const fs::path &file) {
     fs::path absRoot = fs::weakly_canonical(root);
     fs::path absFile = fs::weakly_canonical(file);
@@ -132,7 +159,8 @@ DistBuilder::Page DistBuilder::parsePage(const fs::path &path) {
     std::stringstream input(dat.markdown);
     std::string htmlSrc = mdParser->Parse(input);
 
-    auto innerHTML = std::make_unique<HTMLTree>(htmlParser, htmlSrc);
+    auto innerHTML = std::make_unique<HTMLTree>(htmlParser, htmlSrc, true);
+    innerHTML->Print();
 
     YAML::Node pageData = YAML::Load(dat.yaml);
 
@@ -151,7 +179,7 @@ std::pair<std::string, DistBuilder::HTML> DistBuilder::readHTML(const fs::path &
 
     while (std::getline(file, line)) htmlSrc += line;
 
-    auto innerHTML = std::make_unique<HTMLTree>(htmlParser, htmlSrc);
+    auto innerHTML = std::make_unique<HTMLTree>(htmlParser, htmlSrc, false);
 
     innerHTML->Print();
 
@@ -202,12 +230,26 @@ DistBuilder::FrontmatterSplit DistBuilder::ReadSplitFrontmatter(const fs::path &
     return FrontmatterSplit{std::move(yaml), std::move(markdown)};
 }
 
-void DistBuilder::HTMLTree::Print() {
+void DistBuilder::HTMLTree::SerializeTo(std::ofstream &f) const {
+    mycore_string_raw_t str_raw;
+    mycore_string_raw_clean_all(&str_raw);
+
+    if (myhtml_serialization_tree_buffer(myhtml_tree_get_document(tree), &str_raw)) {
+        tty::err("Could not serialization for the tree");
+        exit(1);
+    }
+
+    f << str_raw.data;
+
+    mycore_string_raw_destroy(&str_raw, false);
+}
+
+void DistBuilder::HTMLTree::Print() const {
     myhtml_tree_node_t *node = myhtml_tree_get_document(tree);
     PrintNode(myhtml_node_child(node), 0);
 }
 
-void DistBuilder::HTMLTree::PrintNode(myhtml_tree_node_t *node, size_t inc) {
+void DistBuilder::HTMLTree::PrintNode(myhtml_tree_node_t *node, size_t inc) const {
     while (node) {
         for (size_t i = 0; i < inc; i++) std::cout << '\t';
 

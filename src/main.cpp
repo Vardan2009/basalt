@@ -17,5 +17,7 @@ int main(int argc, char *argv[]) {
 
     DistBuilder builder("..\\..\\..\\example");
 
+    builder.BuildWebsite();
+
     return 0;
 }
