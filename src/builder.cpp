@@ -153,6 +153,8 @@ std::pair<std::string, DistBuilder::HTML> DistBuilder::readHTML(const fs::path &
 
     auto innerHTML = std::make_unique<HTMLTree>(htmlParser, htmlSrc);
 
+    innerHTML->Print();
+
     return {path.stem().generic_string(), HTML{path, std::move(innerHTML)}};
 }
 
@@ -198,4 +200,54 @@ DistBuilder::FrontmatterSplit DistBuilder::ReadSplitFrontmatter(const fs::path &
     }
 
     return FrontmatterSplit{std::move(yaml), std::move(markdown)};
+}
+
+void DistBuilder::HTMLTree::Print() {
+    myhtml_tree_node_t *node = myhtml_tree_get_document(tree);
+    PrintNode(myhtml_node_child(node), 0);
+}
+
+void DistBuilder::HTMLTree::PrintNode(myhtml_tree_node_t *node, size_t inc) {
+    while (node) {
+        for (size_t i = 0; i < inc; i++) std::cout << '\t';
+
+        const char *tag_name = myhtml_tag_name_by_id(tree, myhtml_node_tag_id(node), NULL);
+        if (tag_name)
+            std::cout << "<'" << tag_name;
+        else
+            std ::cout << "<!error";
+
+        PrintNodeAttrs(node);
+
+        if (myhtml_node_is_close_self(node)) std ::cout << " /";
+
+        myhtml_tag_id_t tag_id = myhtml_node_tag_id(node);
+
+        if (tag_id == MyHTML_TAG__TEXT || tag_id == MyHTML_TAG__COMMENT) {
+            const char *node_text = myhtml_node_text(node, NULL);
+            std ::cout << "'>: \"" << node_text << "\"\n";
+        } else
+            std::cout << "'>\n";
+
+        PrintNode(myhtml_node_child(node), inc + 1);
+        node = myhtml_node_next(node);
+    }
+}
+
+void DistBuilder::HTMLTree::PrintNodeAttrs(myhtml_tree_node_t *node) {
+    myhtml_tree_attr_t *attr = myhtml_node_attribute_first(node);
+
+    while (attr) {
+        const char *name = myhtml_attribute_key(attr, NULL);
+
+        if (name) {
+            std::cout << ' ' << name;
+
+            const char *value = myhtml_attribute_value(attr, NULL);
+
+            std::cout << "=\"" << value << "\"";
+        }
+
+        attr = myhtml_attribute_next(attr);
+    }
 }

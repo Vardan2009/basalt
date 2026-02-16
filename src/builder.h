@@ -31,6 +31,11 @@ class DistBuilder {
         }
 
         ~HTMLTree() { myhtml_tree_destroy(tree); }
+
+        void Print();
+        void PrintNode(myhtml_tree_node_t *node, size_t inc);
+
+        static void PrintNodeAttrs(myhtml_tree_node_t *node);
     };
 
     struct HTML {
