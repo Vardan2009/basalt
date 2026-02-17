@@ -27,8 +27,12 @@ class DistBuilder {
 
     struct HTMLTree {
         myhtml_tree_t *tree;
+        myhtml_t *htmlParser;
 
-        HTMLTree(myhtml_t *htmlParser, const std::string &src, bool isFragment) {
+        HTMLTree(myhtml_t *htmlParser, myhtml_tree_t *tree) : htmlParser(htmlParser), tree(tree) {}
+
+        HTMLTree(myhtml_t *htmlParser, const std::string &src, bool isFragment)
+            : htmlParser(htmlParser) {
             tree = myhtml_tree_create();
             myhtml_tree_init(tree, htmlParser);
             if (isFragment)
@@ -41,14 +45,14 @@ class DistBuilder {
         ~HTMLTree() { myhtml_tree_destroy(tree); }
 
         void SerializeTo(std::ofstream &f) const;
-        void PreprocessTo(const Page &page, std::ofstream &f) const;
+        HTMLTree Preprocess(const Page &page);
+
+        void PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, const Page &page);
 
         void Print() const;
         void PrintNode(myhtml_tree_node_t *node, size_t inc) const;
 
         static void PrintNodeAttrs(myhtml_tree_node_t *node);
-
-        static myhtml_tree_node_t *DeepCopyNode(myhtml_tree_t *tree, myhtml_tree_node_t *node);
     };
 
     struct HTML {
