@@ -23,6 +23,8 @@ class DistBuilder {
         std::string markdown;
     };
 
+    struct Page;
+
     struct HTMLTree {
         myhtml_tree_t *tree;
 
@@ -39,11 +41,14 @@ class DistBuilder {
         ~HTMLTree() { myhtml_tree_destroy(tree); }
 
         void SerializeTo(std::ofstream &f) const;
+        void PreprocessTo(const Page &page, std::ofstream &f) const;
 
         void Print() const;
         void PrintNode(myhtml_tree_node_t *node, size_t inc) const;
 
         static void PrintNodeAttrs(myhtml_tree_node_t *node);
+
+        static myhtml_tree_node_t *DeepCopyNode(myhtml_tree_t *tree, myhtml_tree_node_t *node);
     };
 
     struct HTML {

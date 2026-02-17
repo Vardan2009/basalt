@@ -1,5 +1,7 @@
 #include "builder.h"
 
+#include <string.h>
+
 #include <fstream>
 #include <memory>
 #include <utility>
@@ -157,7 +159,8 @@ void DistBuilder::BuildWebsite() {
         std::ofstream file(route / "index.html");
 
         // only serialize page content for now
-        page.innerHTML->SerializeTo(file);
+        // page.innerHTML->SerializeTo(file);
+        layouts[page.pageData["layout"].as<std::string>()].innerHTML->PreprocessTo(page, file);
     }
 
     if (!publicPath.empty()) {
@@ -287,6 +290,13 @@ void DistBuilder::HTMLTree::SerializeTo(std::ofstream &f) const {
     mycore_string_raw_destroy(&str_raw, false);
 }
 
+void DistBuilder::HTMLTree::PreprocessTo(const Page &page, std::ofstream &f) const {
+    myhtml_tree_node_t *n = myhtml_tree_get_document(tree);
+    myhtml_tree_node_t *nodec = DeepCopyNode(tree, n);
+
+    PrintNode(nodec, 0);
+}
+
 void DistBuilder::HTMLTree::Print() const {
     myhtml_tree_node_t *node = myhtml_tree_get_document(tree);
     PrintNode(myhtml_node_child(node), 0);
@@ -335,4 +345,33 @@ void DistBuilder::HTMLTree::PrintNodeAttrs(myhtml_tree_node_t *node) {
 
         attr = myhtml_attribute_next(attr);
     }
+}
+
+myhtml_tree_node_t *DistBuilder::HTMLTree::DeepCopyNode(myhtml_tree_t *tree,
+                                                        myhtml_tree_node_t *node) {
+    if (node == NULL) return NULL;
+
+    myhtml_tree_node_t *new_node =
+        myhtml_node_create(tree, myhtml_node_tag_id(node), MyHTML_NAMESPACE_ANY);
+
+    if (const char *text = myhtml_node_text(node, NULL))
+        myhtml_node_text_set(new_node, text, strlen(text), myhtml_encoding_get(tree));
+
+    myhtml_tree_attr_t *attr = myhtml_node_attribute_first(node);
+    while (attr) {
+        const char *key = myhtml_attribute_key(attr, NULL);
+        const char *value = myhtml_attribute_value(attr, NULL);
+        myhtml_attribute_add(new_node, key, key ? strlen(key) : 0, value, value ? strlen(value) : 0,
+                             myhtml_encoding_get(tree));
+        attr = myhtml_attribute_next(attr);
+    }
+
+    myhtml_tree_node_t *child = myhtml_node_child(node);
+    while (child) {
+        myhtml_tree_node_t *child_copy = DeepCopyNode(tree, child);
+        myhtml_node_append_child(new_node, child_copy);
+        child = myhtml_node_next(child);
+    }
+
+    return new_node;
 }
