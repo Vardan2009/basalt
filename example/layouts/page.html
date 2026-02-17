@@ -1,10 +1,12 @@
 <!-- This is a comment -->
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
-    <title>{{ global.website-name }} - {{ page.title }}</title>
+    <title>{{ website-name }} - {{ title }}</title>
+
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Basalt Example Website</h1>
+    <basalt-partial>header</basalt-partial>
     <hr />
 
     <basalt-content />

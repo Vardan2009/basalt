@@ -31,6 +31,8 @@ date: 202
 # This one is special, it specifies in which collection the
 # page is in, which can be used in <basalt-for>
 collection: blog
+
+layout: page
 ---
 
 # This is content!!!
@@ -41,7 +43,7 @@ html usage
 ```html
 <basalt-partial>header</basalt-partial>
 <!-- {{}} works even in tags -->
-<title>{{ global.website-name }}</title>
+<title>{{ website-name }}</title>
 <p>{{ page.key }}</p>
 <basalt-content />
 
