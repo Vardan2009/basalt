@@ -425,9 +425,37 @@ DistBuilder::HTMLTree DistBuilder::HTMLTree::Preprocess(const Page &page,
 bool DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node,
                                            const Page &page, const YAML::Node &globalData) {
     myhtml_tag_id_t id = myhtml_node_tag_id(node);
-    const char *tag = myhtml_tag_name_by_id(tree, id, NULL);
+    std::string tag = myhtml_tag_name_by_id(tree, id, NULL);
 
     if (id == MyHTML_TAG__COMMENT) return false;
+
+    if (tag == "basalt-content") {
+        myhtml_tree_node_t *target = myhtml_tree_get_node_html(page.innerHTML->tree);
+
+        if (!target) return false;
+
+        myhtml_tree_node_t *divNode =
+            myhtml_node_create(tree, MyHTML_TAG_DIV, MyHTML_NAMESPACE_HTML);
+        myhtml_attribute_add(divNode, "id", 2, "basalt-content", 14, myhtml_encoding_get(tree));
+
+        myhtml_tree_node_t *srcBody = myhtml_tree_get_node_html(page.innerHTML->tree);
+        if (srcBody) {
+            myhtml_tree_node_t *child = myhtml_node_child(srcBody);
+            while (child) {
+                myhtml_tree_node_t *next = myhtml_node_next(child);
+                myhtml_tree_node_t *childCopy = myhtml_node_clone_deep(tree, child);
+                myhtml_node_append_child(divNode, childCopy);
+                child = next;
+            }
+        }
+
+        myhtml_tree_node_t *parent = myhtml_node_parent(node);
+        if (parent) {
+            myhtml_node_insert_before(node, divNode);
+            myhtml_node_delete_recursive(node);
+            return false;
+        }
+    }
 
     if (const char *text = myhtml_node_text(node, NULL)) {
         std::string processed = DistBuilder::PreprocessText(text, page.pageData, globalData);
