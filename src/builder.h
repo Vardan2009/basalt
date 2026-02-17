@@ -47,7 +47,7 @@ class DistBuilder {
         void SerializeTo(std::ofstream &f) const;
         HTMLTree Preprocess(const Page &page);
 
-        void PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, const Page &page);
+        bool PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, const Page &page);
 
         void Print() const;
         void PrintNode(myhtml_tree_node_t *node, size_t inc) const;

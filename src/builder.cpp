@@ -303,9 +303,12 @@ DistBuilder::HTMLTree DistBuilder::HTMLTree::Preprocess(const Page &page) {
 
     while (n) {
         myhtml_tree_node_t *node = myhtml_node_clone_deep(ntree, n);
-        PreprocessNode(ntree, node, page);
 
-        myhtml_node_append_child(ntreed, node);
+        if (PreprocessNode(ntree, node, page))
+            myhtml_node_append_child(ntreed, node);
+        else
+            myhtml_node_delete_recursive(node);
+
         n = myhtml_node_next(n);
     }
 
@@ -315,11 +318,12 @@ DistBuilder::HTMLTree DistBuilder::HTMLTree::Preprocess(const Page &page) {
     return t;
 }
 
-void DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node,
+bool DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node,
                                            const Page &page) {
-    const char *tag = myhtml_tag_name_by_id(tree, myhtml_node_tag_id(node), NULL);
+    myhtml_tag_id_t id = myhtml_node_tag_id(node);
+    const char *tag = myhtml_tag_name_by_id(tree, id, NULL);
 
-    tty::log("tag({})", tag);
+    if (id == MyHTML_TAG__COMMENT) return false;
 
     if (const char *text = myhtml_node_text(node, NULL))
         myhtml_node_text_set(node, "[processed]", 11, myhtml_encoding_get(tree));
@@ -338,9 +342,12 @@ void DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node
 
     myhtml_tree_node_t *child = myhtml_node_child(node);
     while (child) {
-        PreprocessNode(tree, child, page);
-        child = myhtml_node_next(child);
+        myhtml_tree_node_t *next = myhtml_node_next(child);
+        if (!PreprocessNode(tree, child, page)) myhtml_node_delete_recursive(child);
+        child = next;
     }
+
+    return true;
 }
 
 void DistBuilder::HTMLTree::Print() const {
