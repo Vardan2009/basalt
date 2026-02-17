@@ -1,9 +1,12 @@
 #include "builder.h"
 
-#include <string.h>
+#include <yaml-cpp/yaml.h>
 
 #include <fstream>
 #include <memory>
+#include <regex>
+#include <sstream>
+#include <string>
 #include <utility>
 
 #include "tty.h"
@@ -162,7 +165,7 @@ void DistBuilder::BuildWebsite() {
         // page.innerHTML->SerializeTo(file);
         std::string layout = page.pageData["layout"].as<std::string>();
 
-        HTMLTree final = layouts[layout].innerHTML->Preprocess(page);
+        HTMLTree final = layouts[layout].innerHTML->Preprocess(page, globalData);
         final.SerializeTo(file);
     }
 
@@ -182,6 +185,106 @@ void DistBuilder::BuildWebsite() {
             }
         }
     }
+}
+
+static YAML::Node ResolveYAMLPath(const YAML::Node &root, const std::string &path) {
+    YAML::Node current = YAML::Clone(root);
+    std::string token;
+
+    size_t i = 0;
+    auto fail = []() { return YAML::Node(); };
+
+    while (i < path.size()) {
+        char c = path[i];
+
+        if (c == '.') {
+            if (!token.empty()) {
+                YAML::Node next = current[token];
+                if (!next || !next.IsDefined()) return fail();
+
+                current = next;
+                token.clear();
+            }
+            ++i;
+        } else if (c == '[') {
+            if (!token.empty()) {
+                YAML::Node next = current[token];
+                if (!next || !next.IsDefined()) return fail();
+
+                current = next;
+                token.clear();
+            }
+
+            ++i;
+            if (i >= path.size()) return fail();
+
+            std::string indexStr;
+            while (i < path.size() && path[i] != ']') indexStr += path[i++];
+
+            if (i >= path.size() || path[i] != ']') return fail();
+
+            ++i;
+
+            int idx;
+            try {
+                idx = std::stoi(indexStr);
+            } catch (...) {
+                return fail();
+            }
+
+            YAML::Node next = current[idx];
+            if (!next || !next.IsDefined()) return fail();
+
+            current = next;
+        } else {
+            token += c;
+            ++i;
+        }
+    }
+
+    if (!token.empty()) {
+        YAML::Node next = current[token];
+        if (!next || !next.IsDefined()) return fail();
+
+        current = next;
+    }
+
+    return current;
+}
+
+std::string DistBuilder::PreprocessText(const std::string &src, const YAML::Node &pageData,
+                                        const YAML::Node &globalData) {
+    static const std::regex placeholder(R"(\{\{\s*([\w.\[\]-]+)\s*\}\})");
+
+    std::string result;
+    result.reserve(src.size());
+
+    auto it = std::sregex_iterator(src.begin(), src.end(), placeholder);
+    auto end = std::sregex_iterator();
+    size_t lastPos = 0;
+
+    for (; it != end; ++it) {
+        const std::smatch &match = *it;
+
+        result.append(src, lastPos, match.position() - lastPos);
+        lastPos = match.position() + match.length();
+
+        const std::string key = match[1].str();
+
+        YAML::Node resolved = ResolveYAMLPath(pageData, key);
+        if (resolved.IsNull()) {
+            resolved = ResolveYAMLPath(globalData, key);
+        }
+
+        if (resolved && resolved.IsDefined() && resolved.IsScalar()) {
+            result += resolved.as<std::string>();
+        } else {
+            result += match[0].str();
+        }
+    }
+
+    result.append(src, lastPos, std::string::npos);
+    return result;
 }
 
 std::string DistBuilder::toPermalink(const fs::path &root, const fs::path &file) {
@@ -293,7 +396,8 @@ void DistBuilder::HTMLTree::SerializeTo(std::ofstream &f) const {
     mycore_string_raw_destroy(&str_raw, false);
 }
 
-DistBuilder::HTMLTree DistBuilder::HTMLTree::Preprocess(const Page &page) {
+DistBuilder::HTMLTree DistBuilder::HTMLTree::Preprocess(const Page &page,
+                                                        const YAML::Node &globalData) {
     myhtml_tree_node_t *n = myhtml_node_child(myhtml_tree_get_document(tree));
 
     myhtml_tree_t *ntree = myhtml_tree_create();
@@ -304,7 +408,7 @@ DistBuilder::HTMLTree DistBuilder::HTMLTree::Preprocess(const Page &page) {
     while (n) {
         myhtml_tree_node_t *node = myhtml_node_clone_deep(ntree, n);
 
-        if (PreprocessNode(ntree, node, page))
+        if (PreprocessNode(ntree, node, page, globalData))
             myhtml_node_append_child(ntreed, node);
         else
             myhtml_node_delete_recursive(node);
@@ -319,14 +423,16 @@ DistBuilder::HTMLTree DistBuilder::HTMLTree::Preprocess(const Page &page) {
 }
 
 bool DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node,
-                                           const Page &page) {
+                                           const Page &page, const YAML::Node &globalData) {
     myhtml_tag_id_t id = myhtml_node_tag_id(node);
     const char *tag = myhtml_tag_name_by_id(tree, id, NULL);
 
     if (id == MyHTML_TAG__COMMENT) return false;
 
-    if (const char *text = myhtml_node_text(node, NULL))
-        myhtml_node_text_set(node, "[processed]", 11, myhtml_encoding_get(tree));
+    if (const char *text = myhtml_node_text(node, NULL)) {
+        std::string processed = DistBuilder::PreprocessText(text, page.pageData, globalData);
+        myhtml_node_text_set(node, processed.c_str(), processed.size(), myhtml_encoding_get(tree));
+    }
 
     myhtml_tree_attr_t *attr = myhtml_node_attribute_first(node);
 
@@ -334,8 +440,10 @@ bool DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node
         const char *key = myhtml_attribute_key(attr, NULL);
         mycore_string_t *str = myhtml_attribute_value_string(attr);
 
+        std::string processed = DistBuilder::PreprocessText(str->data, page.pageData, globalData);
+
         mycore_string_clean(str);
-        mycore_string_append(str, "[processed]", 11);
+        mycore_string_append(str, processed.c_str(), processed.size());
 
         attr = myhtml_attribute_next(attr);
     }
@@ -343,7 +451,7 @@ bool DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node
     myhtml_tree_node_t *child = myhtml_node_child(node);
     while (child) {
         myhtml_tree_node_t *next = myhtml_node_next(child);
-        if (!PreprocessNode(tree, child, page)) myhtml_node_delete_recursive(child);
+        if (!PreprocessNode(tree, child, page, globalData)) myhtml_node_delete_recursive(child);
         child = next;
     }
 

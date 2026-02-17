@@ -18,6 +18,9 @@ class DistBuilder {
 
     void BuildWebsite();
 
+    static std::string PreprocessText(const std::string &src, const YAML::Node &pageData,
+                                      const YAML::Node &globalData);
+
     struct FrontmatterSplit {
         std::string yaml;
         std::string markdown;
@@ -45,9 +48,10 @@ class DistBuilder {
         ~HTMLTree() { myhtml_tree_destroy(tree); }
 
         void SerializeTo(std::ofstream &f) const;
-        HTMLTree Preprocess(const Page &page);
+        HTMLTree Preprocess(const Page &page, const YAML::Node &globalData);
 
-        bool PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, const Page &page);
+        bool PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, const Page &page,
+                            const YAML::Node &globalData);
 
         void Print() const;
         void PrintNode(myhtml_tree_node_t *node, size_t inc) const;
