@@ -278,6 +278,7 @@ std::string DistBuilder::PreprocessText(const std::string &src, const YAML::Node
         if (resolved && resolved.IsDefined() && resolved.IsScalar()) {
             result += resolved.as<std::string>();
         } else {
+            tty::warn("YAML path `{}` not found, ignoring...", key);
             result += match[0].str();
         }
     }
@@ -311,7 +312,6 @@ DistBuilder::Page DistBuilder::parsePage(const fs::path &path) {
     std::string htmlSrc = mdParser->Parse(input);
 
     auto innerHTML = std::make_unique<HTMLTree>(htmlParser, htmlSrc, true);
-    innerHTML->Print();
 
     YAML::Node pageData = YAML::Load(dat.yaml);
 
@@ -331,8 +331,6 @@ std::pair<std::string, DistBuilder::HTML> DistBuilder::readHTML(const fs::path &
     while (std::getline(file, line)) htmlSrc += line;
 
     auto innerHTML = std::make_unique<HTMLTree>(htmlParser, htmlSrc, false);
-
-    innerHTML->Print();
 
     return {path.stem().generic_string(), HTML{path, std::move(innerHTML)}};
 }
@@ -429,7 +427,6 @@ DistBuilder::HTMLTree DistBuilder::Preprocess(const Page &page) {
     }
 
     HTMLTree t(htmlParser, ntree);
-    t.Print();
 
     return t;
 }
