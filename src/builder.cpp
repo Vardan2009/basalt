@@ -62,7 +62,7 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
         exit(1);
     }
 
-    if (!pagesPath.empty())
+    if (!pagesPath.empty()) {
         for (const auto &entry : fs::recursive_directory_iterator(pagesPath)) {
             if (!entry.is_regular_file()) continue;
             if (entry.path().extension() != ".md") {
@@ -74,7 +74,24 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
             Page p = parsePage(entry.path());
             pages.push_back(std::move(p));
         }
-    else
+
+        int index = 0;
+        for (const Page &p : pages) {
+            YAML::Node cnode = p.pageData["collection"];
+            if (cnode.IsDefined()) {
+                if (cnode.IsScalar()) {
+                    std::string collection = p.pageData["collection"].as<std::string>();
+                    collections[collection].push_back(index);
+                } else if (cnode.IsSequence()) {
+                    std::vector<std::string> collection =
+                        p.pageData["collection"].as<std::vector<std::string>>();
+                    for (const std::string &c : collection) collections[c].push_back(index);
+                }
+            }
+
+            ++index;
+        }
+    } else
         tty::warn("No pages path provided in config");
 
     if (!layoutsPath.empty())
@@ -188,6 +205,8 @@ void DistBuilder::BuildWebsite() {
 }
 
 static YAML::Node ResolveYAMLPath(const YAML::Node &root, const std::string &path) {
+    if (!root.IsDefined() || root.IsNull()) return YAML::Node();
+
     YAML::Node current = YAML::Clone(root);
     std::string token;
 
@@ -252,7 +271,8 @@ static YAML::Node ResolveYAMLPath(const YAML::Node &root, const std::string &pat
     return current;
 }
 
-std::string DistBuilder::PreprocessText(const std::string &src, const YAML::Node &pageData) {
+std::string DistBuilder::PreprocessText(const std::string &src, const YAML::Node &pageData,
+                                        const YAML::Node &localData) {
     static const std::regex placeholder(R"(\{\{\s*([\w.\[\]-]+)\s*\}\})");
 
     std::string result;
@@ -270,10 +290,9 @@ std::string DistBuilder::PreprocessText(const std::string &src, const YAML::Node
 
         const std::string key = match[1].str();
 
-        YAML::Node resolved = ResolveYAMLPath(pageData, key);
-        if (resolved.IsNull()) {
-            resolved = ResolveYAMLPath(globalData, key);
-        }
+        YAML::Node resolved = ResolveYAMLPath(localData, key);
+        if (resolved.IsNull()) resolved = ResolveYAMLPath(pageData, key);
+        if (resolved.IsNull()) resolved = ResolveYAMLPath(globalData, key);
 
         if (resolved && resolved.IsDefined() && resolved.IsScalar()) {
             result += resolved.as<std::string>();
@@ -418,7 +437,7 @@ DistBuilder::HTMLTree DistBuilder::Preprocess(const Page &page) {
     while (n) {
         myhtml_tree_node_t *node = myhtml_node_clone_deep(ntree, n);
 
-        if (PreprocessNode(ntree, node, page))
+        if (PreprocessNode(ntree, node, page, YAML::Node()))
             myhtml_node_append_child(ntreed, node);
         else
             myhtml_node_delete_recursive(node);
@@ -431,7 +450,8 @@ DistBuilder::HTMLTree DistBuilder::Preprocess(const Page &page) {
     return t;
 }
 
-bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, const Page &page) {
+bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, const Page &page,
+                                 const YAML::Node &localData) {
     myhtml_tag_id_t id = myhtml_node_tag_id(node);
     std::string tag = myhtml_tag_name_by_id(tree, id, NULL);
 
@@ -454,7 +474,7 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
             while (child) {
                 myhtml_tree_node_t *next = myhtml_node_next(child);
                 myhtml_tree_node_t *childCopy = myhtml_node_clone_deep(tree, child);
-                PreprocessNode(tree, childCopy, page);
+                PreprocessNode(tree, childCopy, page, localData);
                 myhtml_node_append_child(divNode, childCopy);
                 child = next;
             }
@@ -481,7 +501,7 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
         }
 
         std::string id = text;
-        id = DistBuilder::PreprocessText(id, page.pageData);
+        id = DistBuilder::PreprocessText(id, page.pageData, localData);
 
         if (!partials.contains(id)) {
             tty::warn("(in {}) Partial `{}` not found, ignoring", page.route, id);
@@ -503,7 +523,7 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
             myhtml_tree_node_t *next = myhtml_node_next(child);
 
             myhtml_tree_node_t *childCopy = myhtml_node_clone_deep(tree, child);
-            PreprocessNode(tree, childCopy, page);
+            PreprocessNode(tree, childCopy, page, localData);
 
             myhtml_node_insert_before(node, childCopy);
 
@@ -511,10 +531,52 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
         }
 
         return false;
+    } else if (tag == "basalt-for") {
+        myhtml_tree_attr_t *collection = myhtml_attribute_by_key(node, "collection", 10);
+        myhtml_tree_attr_t *as = myhtml_attribute_by_key(node, "as", 2);
+
+        if (!collection || !as) {
+            tty::err("(in {}) basalt-for expects attributes `collection` and `as`", page.route);
+            exit(1);
+        }
+
+        std::string collectionId =
+            PreprocessText(myhtml_attribute_value(collection, NULL), page.pageData, localData);
+        std::string varnameAs =
+            PreprocessText(myhtml_attribute_value(as, NULL), page.pageData, localData);
+
+        if (!collections.contains(collectionId)) {
+            tty::err("(in {}) Collection `{}` not found", page.route, collectionId);
+            exit(1);
+        }
+
+        for (int idx : collections[collectionId]) {
+            YAML::Node localDataCopy = YAML::Clone(localData);
+
+            YAML::Node iterPageData = YAML::Clone(pages[idx].pageData);
+            iterPageData["basalt-route"] = pages[idx].route;
+
+            localDataCopy[varnameAs] = iterPageData;
+
+            myhtml_tree_node_t *child = myhtml_node_child(node);
+
+            while (child) {
+                myhtml_tree_node_t *next = myhtml_node_next(child);
+
+                myhtml_tree_node_t *childCopy = myhtml_node_clone_deep(tree, child);
+                PreprocessNode(tree, childCopy, page, localDataCopy);
+
+                myhtml_node_insert_before(node, childCopy);
+
+                child = next;
+            }
+        }
+
+        return false;
     }
 
     if (const char *text = myhtml_node_text(node, NULL)) {
-        std::string processed = DistBuilder::PreprocessText(text, page.pageData);
+        std::string processed = DistBuilder::PreprocessText(text, page.pageData, localData);
         myhtml_node_text_set(node, processed.c_str(), processed.size(), myhtml_encoding_get(tree));
     }
 
@@ -524,7 +586,7 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
         const char *key = myhtml_attribute_key(attr, NULL);
         mycore_string_t *str = myhtml_attribute_value_string(attr);
 
-        std::string processed = DistBuilder::PreprocessText(str->data, page.pageData);
+        std::string processed = DistBuilder::PreprocessText(str->data, page.pageData, localData);
 
         mycore_string_clean(str);
         mycore_string_append(str, processed.c_str(), processed.size());
@@ -535,7 +597,7 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
     myhtml_tree_node_t *child = myhtml_node_child(node);
     while (child) {
         myhtml_tree_node_t *next = myhtml_node_next(child);
-        if (!PreprocessNode(tree, child, page)) myhtml_node_delete_recursive(child);
+        if (!PreprocessNode(tree, child, page, localData)) myhtml_node_delete_recursive(child);
         child = next;
     }
 

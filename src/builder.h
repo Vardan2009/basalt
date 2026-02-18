@@ -71,11 +71,13 @@ class DistBuilder {
 
     FrontmatterSplit ReadSplitFrontmatter(const fs::path &path);
 
-    std::string PreprocessText(const std::string &src, const YAML::Node &pageData);
+    std::string PreprocessText(const std::string &src, const YAML::Node &pageData,
+                               const YAML::Node &localData);
 
     HTMLTree Preprocess(const Page &page);
 
-    bool PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, const Page &page);
+    bool PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, const Page &page,
+                        const YAML::Node &localData);
 
     fs::path projectRoot;
     YAML::Node projectConfig;
@@ -89,6 +91,8 @@ class DistBuilder {
     std::vector<Page> pages;
     std::unordered_map<std::string, HTML> layouts;
     std::unordered_map<std::string, HTML> partials;
+
+    std::unordered_map<std::string, std::vector<int>> collections;
 
     YAML::Node globalData;
 
