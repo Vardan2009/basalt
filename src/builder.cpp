@@ -163,9 +163,9 @@ void DistBuilder::BuildWebsite() {
 
         // only serialize page content for now
         // page.innerHTML->SerializeTo(file);
-        std::string layout = page.pageData["layout"].as<std::string>();
+        // std::string layout = page.pageData["layout"].as<std::string>();
 
-        HTMLTree final = layouts[layout].innerHTML->Preprocess(page, globalData);
+        HTMLTree final = Preprocess(page);
         final.SerializeTo(file);
     }
 
@@ -252,8 +252,7 @@ static YAML::Node ResolveYAMLPath(const YAML::Node &root, const std::string &pat
     return current;
 }
 
-std::string DistBuilder::PreprocessText(const std::string &src, const YAML::Node &pageData,
-                                        const YAML::Node &globalData) {
+std::string DistBuilder::PreprocessText(const std::string &src, const YAML::Node &pageData) {
     static const std::regex placeholder(R"(\{\{\s*([\w.\[\]-]+)\s*\}\})");
 
     std::string result;
@@ -396,8 +395,21 @@ void DistBuilder::HTMLTree::SerializeTo(std::ofstream &f) const {
     mycore_string_raw_destroy(&str_raw, false);
 }
 
-DistBuilder::HTMLTree DistBuilder::HTMLTree::Preprocess(const Page &page,
-                                                        const YAML::Node &globalData) {
+DistBuilder::HTMLTree DistBuilder::Preprocess(const Page &page) {
+    if (!page.pageData["layout"].IsDefined() || page.pageData["layout"].IsNull() ||
+        !page.pageData["layout"].IsScalar()) {
+        tty::err("(in {}) Page data `layout` missing or invalid", page.route);
+        exit(1);
+    }
+
+    std::string layoutId = page.pageData["layout"].as<std::string>();
+    if (!layouts.contains(layoutId)) {
+        tty::err("(in {}) Layout `{}` not found", page.route, layoutId);
+        exit(1);
+    }
+
+    myhtml_tree_t *tree = layouts[layoutId].innerHTML->tree;
+
     myhtml_tree_node_t *n = myhtml_node_child(myhtml_tree_get_document(tree));
 
     myhtml_tree_t *ntree = myhtml_tree_create();
@@ -408,7 +420,7 @@ DistBuilder::HTMLTree DistBuilder::HTMLTree::Preprocess(const Page &page,
     while (n) {
         myhtml_tree_node_t *node = myhtml_node_clone_deep(ntree, n);
 
-        if (PreprocessNode(ntree, node, page, globalData))
+        if (PreprocessNode(ntree, node, page))
             myhtml_node_append_child(ntreed, node);
         else
             myhtml_node_delete_recursive(node);
@@ -422,8 +434,7 @@ DistBuilder::HTMLTree DistBuilder::HTMLTree::Preprocess(const Page &page,
     return t;
 }
 
-bool DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node,
-                                           const Page &page, const YAML::Node &globalData) {
+bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, const Page &page) {
     myhtml_tag_id_t id = myhtml_node_tag_id(node);
     std::string tag = myhtml_tag_name_by_id(tree, id, NULL);
 
@@ -432,7 +443,9 @@ bool DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node
     if (tag == "basalt-content") {
         myhtml_tree_node_t *target = myhtml_tree_get_node_html(page.innerHTML->tree);
 
-        if (!target) return false;
+        if (!target) {
+            return false;
+        }
 
         myhtml_tree_node_t *divNode =
             myhtml_node_create(tree, MyHTML_TAG_DIV, MyHTML_NAMESPACE_HTML);
@@ -444,6 +457,7 @@ bool DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node
             while (child) {
                 myhtml_tree_node_t *next = myhtml_node_next(child);
                 myhtml_tree_node_t *childCopy = myhtml_node_clone_deep(tree, child);
+                PreprocessNode(tree, childCopy, page);
                 myhtml_node_append_child(divNode, childCopy);
                 child = next;
             }
@@ -452,13 +466,58 @@ bool DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node
         myhtml_tree_node_t *parent = myhtml_node_parent(node);
         if (parent) {
             myhtml_node_insert_before(node, divNode);
+            return false;
+        }
+    } else if (tag == "basalt-partial") {
+        myhtml_tree_node_t *textNode = myhtml_node_child(node);
+
+        if (myhtml_node_tag_id(textNode) != MyHTML_TAG__TEXT) {
+            tty::warn("basalt-partial only expects text, ignoring");
             myhtml_node_delete_recursive(node);
             return false;
         }
+
+        const char *text = myhtml_node_text(textNode, NULL);
+        if (!text) {
+            tty::warn("basalt-partial only expects text, ignoring");
+            return false;
+        }
+
+        std::string id = text;
+        id = DistBuilder::PreprocessText(id, page.pageData);
+
+        if (!partials.contains(id)) {
+            tty::warn("(in {}) Partial `{}` not found, ignoring", page.route, id);
+            return false;
+        }
+
+        myhtml_tree_node_t *srcBody = myhtml_tree_get_node_html(partials[id].innerHTML->tree);
+
+        if (!srcBody) return false;
+
+        myhtml_tree_node_t *parent = myhtml_node_parent(node);
+        if (!parent) {
+            return false;
+        }
+
+        myhtml_tree_node_t *child = myhtml_node_child(srcBody);
+
+        while (child) {
+            myhtml_tree_node_t *next = myhtml_node_next(child);
+
+            myhtml_tree_node_t *childCopy = myhtml_node_clone_deep(tree, child);
+            PreprocessNode(tree, childCopy, page);
+
+            myhtml_node_insert_before(node, childCopy);
+
+            child = next;
+        }
+
+        return false;
     }
 
     if (const char *text = myhtml_node_text(node, NULL)) {
-        std::string processed = DistBuilder::PreprocessText(text, page.pageData, globalData);
+        std::string processed = DistBuilder::PreprocessText(text, page.pageData);
         myhtml_node_text_set(node, processed.c_str(), processed.size(), myhtml_encoding_get(tree));
     }
 
@@ -468,7 +527,7 @@ bool DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node
         const char *key = myhtml_attribute_key(attr, NULL);
         mycore_string_t *str = myhtml_attribute_value_string(attr);
 
-        std::string processed = DistBuilder::PreprocessText(str->data, page.pageData, globalData);
+        std::string processed = DistBuilder::PreprocessText(str->data, page.pageData);
 
         mycore_string_clean(str);
         mycore_string_append(str, processed.c_str(), processed.size());
@@ -479,7 +538,7 @@ bool DistBuilder::HTMLTree::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node
     myhtml_tree_node_t *child = myhtml_node_child(node);
     while (child) {
         myhtml_tree_node_t *next = myhtml_node_next(child);
-        if (!PreprocessNode(tree, child, page, globalData)) myhtml_node_delete_recursive(child);
+        if (!PreprocessNode(tree, child, page)) myhtml_node_delete_recursive(child);
         child = next;
     }
 
