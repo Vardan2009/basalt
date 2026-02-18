@@ -47,9 +47,9 @@ html usage
 <p>{{ page.key }}</p>
 <basalt-content />
 
-<basalt-for collection="blog">
+<basalt-for collection="blog" as="page">
     <li>
-        <a href="{{ url }}">{{ title }} @ {{ date }}</a>
+        <a href="{{ page.url }}">{{ page.title }} @ {{ page.date }}</a>
     </li>
 </basalt-for>
 ```
