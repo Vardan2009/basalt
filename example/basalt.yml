@@ -6,5 +6,6 @@ site:
 
     data:
         website-name: Basalt Example Website
+        header-partial-id: header
 
     out: dist
