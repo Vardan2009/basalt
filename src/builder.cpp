@@ -15,7 +15,10 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
     tty::log("Initializing DistBuilder...");
     tty::log("Project Root: {}", projectRoot.generic_string());
 
-    mdParser = std::make_shared<maddy::Parser>();
+    std::shared_ptr<maddy::ParserConfig> mdConfig = std::make_shared<maddy::ParserConfig>();
+    mdConfig->enabledParsers |= maddy::types::HTML_PARSER;
+    mdParser = std::make_shared<maddy::Parser>(mdConfig);
+
     htmlParser = myhtml_create();
     myhtml_init(htmlParser, MyHTML_OPTIONS_DEFAULT, 1, 0);
 
