@@ -491,7 +491,7 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
             return false;
         }
 
-        myhtml_tree_node_t *srcBody = myhtml_tree_get_node_html(partials[id].innerHTML->tree);
+        myhtml_tree_node_t *srcBody = myhtml_tree_get_node_body(partials[id].innerHTML->tree);
 
         if (!srcBody) return false;
 
