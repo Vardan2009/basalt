@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <utility>
 
+#include "defs.h"
 #include "tty.h"
 
 DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
@@ -17,7 +18,7 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
     tty::log("Project Root: {}", projectRoot.generic_string());
 
     std::shared_ptr<maddy::ParserConfig> mdConfig = std::make_shared<maddy::ParserConfig>();
-    mdConfig->enabledParsers |= maddy::types::HTML_PARSER;
+    mdConfig->enabledParsers |= maddy::types::ALL;
     mdParser = std::make_shared<maddy::Parser>(mdConfig);
 
     htmlParser = myhtml_create();
@@ -39,6 +40,7 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
     std::cout << projectConfig << '\n';
 
     globalData = projectConfig["data"];
+    globalData["basalt-version"] = defs::basaltVersion;
 
     if (projectConfig["pages"].IsDefined())
         pagesPath = projectRoot / (projectConfig["pages"].as<std::string>());
@@ -471,6 +473,9 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
     std::string tag = myhtml_tag_name_by_id(tree, id, NULL);
 
     if (id == MyHTML_TAG__COMMENT) return false;
+
+    if (id == MyHTML_TAG_CODE) return true;
+    if (id == MyHTML_TAG_PRE) return true;
 
     if (tag == "basalt-content") {
         myhtml_tree_node_t *target = myhtml_tree_get_node_html(page.innerHTML->tree);

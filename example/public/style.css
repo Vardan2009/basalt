@@ -1,10 +1,150 @@
-/* This is a comment */
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap");
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --accent: #284b63;
+    --accent-darker: #153243;
+    --bg: #b4b8ab;
+    --fg: #161925;
+}
+
 body {
-    background-color: burlywood;
-    font-family: 'Times New Roman', Times, serif;
-    color: darkblue;
+    font-family: "Montserrat", sans-serif;
+    font-optical-sizing: auto;
+    font-style: normal;
+
+    background-color: var(--bg);
+    color: var(--fg);
+}
+
+header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    justify-content: space-around;
+
+    background-color: var(--accent-darker);
+
+    padding: 10px;
+    margin-bottom: 30px;
+
+    color: var(--bg);
+
+    user-select: none;
+
+    flex-wrap: wrap;
+}
+
+@media screen and (max-width: 550px) {
+    .sm-hide {
+        display: none;
+    }
+}
+
+header h1 {
+    margin: 0;
+    color: var(--bg);
+    font-weight: 900;
+}
+
+nav {
+    display: flex;
+    gap: 30px;
+}
+
+header a {
+    color: var(--bg) !important;
+}
+
+nav > a {
+    opacity: 0.7;
+    height: 10px;
+    display: inline-flex;
+    align-items: center;
+}
+
+nav > a:visited {
+    color: var(--bg);
+}
+
+a {
+    text-decoration: none;
+
+    transition: 0.3s;
+
+    color: var(--accent);
+}
+
+a:visited {
+    color: var(--accent);
+}
+
+a:hover {
+    font-style: normal;
+    opacity: 1;
+}
+
+div#content-wrapper {
+    display: flex;
+    justify-content: center;
 }
 
 div#basalt-content {
-    color: red;
+    width: 80%;
+}
+
+::selection,
+::-moz-selection {
+    background-color: var(--accent-darker);
+    color: var(--bg);
+}
+
+h1 {
+    font-size: 48px;
+    margin-bottom: 30px;
+    margin-top: 30px;
+    color: var(--accent-darker);
+}
+
+h2 {
+    font-size: 24px;
+}
+
+h2,
+h3,
+h4,
+h5,
+h6 {
+    color: var(--accent-darker);
+    margin-bottom: 15px;
+    margin-top: 30px;
+}
+
+ul {
+    list-style-type: square;
+    list-style-position: inside;
+    user-select: none;
+}
+
+li::marker {
+    color: var(--accent);
+}
+
+code {
+    background-color: var(--accent-darker);
+    color: white;
+    display: block;
+    padding: 10px;
+    padding-top: 0;
+}
+
+code::selection,
+code::-moz-selection {
+    background-color: var(--bg);
+    color: var(--accent-darker);
 }

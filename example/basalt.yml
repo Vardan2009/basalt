@@ -5,7 +5,6 @@ site:
     public: public
 
     data:
-        website-name: Basalt Example Website
-        header-partial-id: header
+        website-name: Basalt
 
     out: dist

@@ -1,16 +1,15 @@
-<!-- This is a comment -->
 <html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-    <title>{{ website-name }} - {{ title }}</title>
+    <head>
+        <title>{{ website-name }} - {{ title }}</title>
 
-    <link rel="stylesheet" href="/style.css">
-</head>
-<body>
-    <basalt-partial>{{ header-partial-id }}</basalt-partial>
-    <hr />
+        <link rel="stylesheet" href="/style.css" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    </head>
+    <body>
+        <basalt-partial>header</basalt-partial>
 
-    <!-- cool -->
-
-    <basalt-content />
-</body>
+        <div id="content-wrapper">
+            <basalt-content />
+        </div>
+    </body>
 </html>

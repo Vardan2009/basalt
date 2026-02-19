@@ -1,25 +1,20 @@
 ---
-title: Main Page
+title: Welcome
 
 layout: page
-collection: webpages
 ---
 
-# Hello!
-## This is a subtitle
+# Welcome to Basalt version {{ basalt-version }}!
 
-# The name of this website is {{ website-name }}
+Basalt is a lightweight static site generator and templating engine written in C++.
+This is an example web-page created using it to show its capabilities.
 
-This is **basalt**!
-
-## Sitemap
+# About Basalt
 
 <ul>
-<basalt-for collection="webpages" as="page">
-	<li>
-		<a href="{{ page.basalt-route }}">{{ page.title }}</a>
-	</li>
-</basalt-for>
+    <basalt-for collection="about" as="page">
+        <li style="font-size: 24px">
+            <a href="{{ page.basalt-route }}">{{ page.title }}</a>
+        </li>
+    </basalt-for>
 </ul>
-
-# This shouldn't work ==> {{ page.basalt-route }}
