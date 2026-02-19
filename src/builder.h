@@ -63,6 +63,12 @@ class DistBuilder {
         YAML::Node pageData;
     };
 
+    fs::path pagesPath;
+    fs::path layoutsPath;
+    fs::path partialsPath;
+    fs::path publicPath;
+    fs::path outPath;
+
    private:
     std::string toPermalink(const fs::path &root, const fs::path &file);
 
@@ -81,12 +87,6 @@ class DistBuilder {
 
     fs::path projectRoot;
     YAML::Node projectConfig;
-
-    fs::path pagesPath;
-    fs::path layoutsPath;
-    fs::path partialsPath;
-    fs::path publicPath;
-    fs::path outPath;
 
     std::vector<Page> pages;
     std::unordered_map<std::string, HTML> layouts;
