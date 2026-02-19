@@ -7,6 +7,7 @@
 #include <regex>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <utility>
 
 #include "tty.h"
@@ -143,24 +144,35 @@ DistBuilder::DistBuilder(fs::path projectRoot) : projectRoot(projectRoot) {
 DistBuilder::~DistBuilder() { myhtml_destroy(htmlParser); }
 
 void DistBuilder::BuildWebsite() {
-    if (fs::exists(outPath) && fs::is_directory(outPath)) {
-        tty::warn("Output path `{}` is not empty, delete and overwrite? (y/N)",
-                  outPath.generic_string());
+    std::unordered_set<fs::path> expectedFiles;
 
-        char c;
-        std::cin >> c;
+    for (const Page &page : pages) {
+        fs::path r = page.route;
+        fs::path route = outPath / r.relative_path() / "index.html";
+        expectedFiles.insert(route);
+    }
 
-        if (c != 'y' && c != 'Y') {
-            tty::warn("Aborting...");
-            exit(0);
+    if (!publicPath.empty()) {
+        for (const auto &entry : fs::recursive_directory_iterator(publicPath)) {
+            if (!entry.is_regular_file()) continue;
+            fs::path dest = outPath / entry.path().relative_path();
+            expectedFiles.insert(dest);
         }
+    }
 
-        std::error_code ec;
-        fs::remove_all(outPath, ec);
-
-        if (ec) {
-            tty::err("Error deleting output: {}", ec.message());
-            exit(1);
+    if (fs::exists(outPath)) {
+        for (const auto &entry : fs::recursive_directory_iterator(outPath)) {
+            if (!entry.is_regular_file()) continue;
+            if (!expectedFiles.contains(entry.path())) {
+                std::error_code ec;
+                fs::remove(entry.path(), ec);
+                if (ec) {
+                    tty::err("Error removing `{}`: {}", entry.path().generic_string(),
+                             ec.message());
+                    exit(1);
+                }
+                tty::log("Removed `{}`", entry.path().generic_string());
+            }
         }
     }
 
