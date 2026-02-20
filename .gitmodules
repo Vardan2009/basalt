@@ -1,9 +1,9 @@
 [submodule "src/vendor/yaml-cpp"]
 	path = src/vendor/yaml-cpp
 	url = https://github.com/jbeder/yaml-cpp
-[submodule "src/vendor/maddy"]
-	path = src/vendor/maddy
-	url = https://github.com/progsource/maddy
 [submodule "src/vendor/myhtml"]
 	path = src/vendor/myhtml
 	url = https://github.com/lexborisov/myhtml.git
+[submodule "src/vendor/maddy"]
+	path = src/vendor/maddy
+	url = https://github.com/Vardan2009/maddy.git
