@@ -20,5 +20,5 @@ collection: about   # (optional) what collection the page is in (used in &lt;bas
 
 # You can write Markdown
 
-&lt;h1&gt;...or HTML here!&lt;/h1&gt;
+<h1>...or HTML here!</h1>
 ```
