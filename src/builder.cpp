@@ -554,6 +554,8 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
     } else if (tag == "basalt-for") {
         myhtml_tree_attr_t *collection = myhtml_attribute_by_key(node, "collection", 10);
         myhtml_tree_attr_t *as = myhtml_attribute_by_key(node, "as", 2);
+        myhtml_tree_attr_t *sort = myhtml_attribute_by_key(node, "sort", 4);
+        myhtml_tree_attr_t *reverse = myhtml_attribute_by_key(node, "sort-reverse", 12);
 
         if (!collection || !as) {
             tty::err("(in {}) basalt-for expects attributes `collection` and `as`", page.route);
@@ -570,7 +572,42 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
             exit(1);
         }
 
-        for (int idx : collections[collectionId]) {
+        std::vector<int> collectionsCopy = collections[collectionId];
+
+        if (sort) {
+            std::string sortAttr =
+                PreprocessText(myhtml_attribute_value(sort, NULL), page.pageData, localData);
+            std::sort(collectionsCopy.begin(), collectionsCopy.end(), [&](int a, int b) {
+                YAML::Node dataA = pages[a].pageData[sortAttr];
+                YAML::Node dataB = pages[b].pageData[sortAttr];
+
+                if (!dataA || !dataB) return dataA.IsDefined();
+
+                if (!dataA.IsScalar() || !dataB.IsScalar()) return false;
+
+                std::string strA = dataA.as<std::string>();
+                std::string strB = dataB.as<std::string>();
+
+                try {
+                    size_t posA, posB;
+                    double numA = std::stod(strA, &posA);
+                    double numB = std::stod(strB, &posB);
+
+                    if (posA == strA.size() && posB == strB.size()) {
+                        return numA < numB;
+                    }
+                } catch (...) {
+                }
+
+                return strA < strB;
+            });
+        }
+
+        if (reverse) {
+            std::reverse(collectionsCopy.begin(), collectionsCopy.end());
+        }
+
+        for (int idx : collectionsCopy) {
             YAML::Node localDataCopy = YAML::Clone(localData);
 
             YAML::Node iterPageData = YAML::Clone(pages[idx].pageData);

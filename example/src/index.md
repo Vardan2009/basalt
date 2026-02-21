@@ -12,7 +12,7 @@ This is an example web-page created using it to show its capabilities.
 # About Basalt
 
 <ul>
-    <basalt-for collection="about" as="page">
+    <basalt-for collection="about" as="page" sort="order" sort-reverse>
         <li style="font-size: 24px">
             <a href="{{ page.basalt-route }}">{{ page.title }}</a>
         </li>

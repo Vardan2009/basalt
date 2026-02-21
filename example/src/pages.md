@@ -3,6 +3,7 @@ title: Pages
 
 layout: page
 collection: about
+order: 1
 ---
 
 # Pages
@@ -10,12 +11,13 @@ collection: about
 **Pages** in Basalt use Markdown (+ optional HTML) for content and a YAML Frontmatter for required and custom metadata
 
 ## Example Page
+
 ```
 ---
 title: My Webpage
 
 layout: page        # determines what layout is used
-collection: about   # (optional) what collection the page is in (used in &lt;basalt-for&gt;)
+collection: about   # (optional) what collection the page is in (used in <basalt-for>)
 ---
 
 # You can write Markdown
