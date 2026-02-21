@@ -470,7 +470,10 @@ DistBuilder::HTMLTree DistBuilder::Preprocess(const Page &page) {
 bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, const Page &page,
                                  const YAML::Node &localData) {
     myhtml_tag_id_t id = myhtml_node_tag_id(node);
-    std::string tag = myhtml_tag_name_by_id(tree, id, NULL);
+    const char *tagc = myhtml_tag_name_by_id(tree, id, NULL);
+    if (!tagc) return false;
+
+    std::string tag = tagc;
 
     if (id == MyHTML_TAG__COMMENT) return false;
 
@@ -643,10 +646,13 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
         const char *key = myhtml_attribute_key(attr, NULL);
         mycore_string_t *str = myhtml_attribute_value_string(attr);
 
-        std::string processed = DistBuilder::PreprocessText(str->data, page.pageData, localData);
+        if (str->data) {
+            std::string processed =
+                DistBuilder::PreprocessText(str->data, page.pageData, localData);
 
-        mycore_string_clean(str);
-        mycore_string_append(str, processed.c_str(), processed.size());
+            mycore_string_clean(str);
+            mycore_string_append(str, processed.c_str(), processed.size());
+        }
 
         attr = myhtml_attribute_next(attr);
     }
