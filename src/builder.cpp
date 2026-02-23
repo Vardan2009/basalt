@@ -498,8 +498,11 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
             while (child) {
                 myhtml_tree_node_t *next = myhtml_node_next(child);
                 myhtml_tree_node_t *childCopy = myhtml_node_clone_deep(tree, child);
-                PreprocessNode(tree, childCopy, page, localData);
+
                 myhtml_node_append_child(divNode, childCopy);
+                bool b = PreprocessNode(tree, childCopy, page, localData);
+                if (!b) myhtml_node_delete_recursive(childCopy);
+
                 child = next;
             }
         }
@@ -547,9 +550,10 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
             myhtml_tree_node_t *next = myhtml_node_next(child);
 
             myhtml_tree_node_t *childCopy = myhtml_node_clone_deep(tree, child);
-            PreprocessNode(tree, childCopy, page, localData);
-
             myhtml_node_insert_before(node, childCopy);
+
+            bool b = PreprocessNode(tree, childCopy, page, localData);
+            if (!b) myhtml_node_delete_recursive(childCopy);
 
             child = next;
         }
@@ -560,6 +564,11 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
         myhtml_tree_attr_t *as = myhtml_attribute_by_key(node, "as", 2);
         myhtml_tree_attr_t *sort = myhtml_attribute_by_key(node, "sort", 4);
         myhtml_tree_attr_t *reverse = myhtml_attribute_by_key(node, "sort-reverse", 12);
+
+        myhtml_tree_node_t *parent = myhtml_node_parent(node);
+        if (!parent) {
+            return false;
+        }
 
         if (!collection || !as) {
             tty::err("(in {}) basalt-for expects attributes `collection` and `as`", page.route);
@@ -634,9 +643,10 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
                 myhtml_tree_node_t *next = myhtml_node_next(child);
 
                 myhtml_tree_node_t *childCopy = myhtml_node_clone_deep(tree, child);
-                PreprocessNode(tree, childCopy, page, localDataCopy);
-
                 myhtml_node_insert_before(node, childCopy);
+
+                bool b = PreprocessNode(tree, childCopy, page, localDataCopy);
+                if (!b) myhtml_node_delete_recursive(childCopy);
 
                 child = next;
             }
