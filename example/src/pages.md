@@ -3,7 +3,7 @@ title: Pages
 
 layout: page
 collection: about
-order: 1
+date: 2025-01-01
 ---
 
 # Pages

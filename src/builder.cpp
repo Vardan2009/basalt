@@ -10,6 +10,7 @@
 #include <unordered_set>
 #include <utility>
 
+#include "date.h"
 #include "defs.h"
 #include "tty.h"
 
@@ -580,30 +581,39 @@ bool DistBuilder::PreprocessNode(myhtml_tree_t *tree, myhtml_tree_node_t *node, 
         if (sort) {
             std::string sortAttr =
                 PreprocessText(myhtml_attribute_value(sort, NULL), page.pageData, localData);
-            std::sort(collectionsCopy.begin(), collectionsCopy.end(), [&](int a, int b) {
-                YAML::Node dataA = pages[a].pageData[sortAttr];
-                YAML::Node dataB = pages[b].pageData[sortAttr];
 
-                if (!dataA || !dataB) return dataA.IsDefined();
+            using SortKey = std::variant<std::monostate, double, Date, std::string>;
 
-                if (!dataA.IsScalar() || !dataB.IsScalar()) return false;
+            std::vector<SortKey> keys(collectionsCopy.size());
 
-                std::string strA = dataA.as<std::string>();
-                std::string strB = dataB.as<std::string>();
+            for (size_t i = 0; i < collectionsCopy.size(); ++i) {
+                int idx = collectionsCopy[i];
+                YAML::Node data = pages[idx].pageData[sortAttr];
 
-                try {
-                    size_t posA, posB;
-                    double numA = std::stod(strA, &posA);
-                    double numB = std::stod(strB, &posB);
-
-                    if (posA == strA.size() && posB == strB.size()) {
-                        return numA < numB;
-                    }
-                } catch (...) {
+                if (!data || !data.IsScalar()) {
+                    keys[i] = std::monostate{};
+                    continue;
                 }
 
-                return strA < strB;
-            });
+                std::string str = data.as<std::string>();
+
+                char *end;
+                double num = std::strtod(str.c_str(), &end);
+                if (end == str.c_str() + str.size()) {
+                    keys[i] = num;
+                    continue;
+                }
+
+                if (auto d = parseDate(str)) {
+                    keys[i] = *d;
+                    continue;
+                }
+
+                keys[i] = std::move(str);
+            }
+
+            std::sort(collectionsCopy.begin(), collectionsCopy.end(),
+                      [&](size_t i1, size_t i2) { return keys[i1] < keys[i2]; });
         }
 
         if (reverse) {

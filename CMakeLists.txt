@@ -21,8 +21,8 @@ add_executable (basalt
 	src/defs.h
 	src/builder.h
 	src/builder.cpp
+	src/date.h
 )
-
 
 target_link_libraries (basalt PUBLIC yaml-cpp::yaml-cpp maddy myhtml_static)
 target_include_directories (basalt PUBLIC src/vendor/myhtml/include) # this sucks, but whatever
